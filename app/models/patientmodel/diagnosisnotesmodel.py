@@ -12,3 +12,5 @@ class DiagnosisNotes(Base):
     symptoms_progression = Column(Text)
     follow_up_notes = Column(Text)
     treatment_plan = Column(Text)
+    patient_symptoms = Column(Text)
+    symptom_tokens = Column(Text)
