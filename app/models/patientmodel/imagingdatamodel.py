@@ -1,5 +1,10 @@
 # app/models/patientmodel/imagingdatamodel.py
 
+from sqlalchemy import Column, ForeignKey, Integer, String
+
+from app.core.database import Base
+
+
 class ImagingData(Base):
     __tablename__ = "imaging_data"
 

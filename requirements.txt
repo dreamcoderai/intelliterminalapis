@@ -6,3 +6,4 @@ python-jose
 passlib
 python-multipart
 python-dotenv
+boto3
