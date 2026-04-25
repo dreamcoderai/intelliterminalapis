@@ -1,8 +1,11 @@
 # app/api/patient/patientroutes.py
 
 import json
+import os
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -30,6 +33,39 @@ from app.schemas.patientschema.remotemonitoringschema import RemoteMonitoringSch
 from app.schemas.patientschema.vitalsignschema import VitalSignsSchema
 
 patientrouter = APIRouter(prefix="/patients", tags=["Patients"])
+
+ALLOWED_SPACE_HOST = os.getenv("SPACE_BUCKET", "") + "." + os.getenv("SPACE_REGION", "") + ".digitaloceanspaces.com"
+
+@patientrouter.get("/file-proxy")
+async def file_proxy(url: str):
+    if ALLOWED_SPACE_HOST not in url:
+        raise HTTPException(status_code=403, detail="URL not allowed.")
+
+    ext = url.split("?")[0].split(".")[-1].lower()
+    mime_map = {
+        "zip": "application/zip",
+        "rar": "application/x-rar-compressed",
+        "dcm": "application/dicom",
+        "pdf": "application/pdf",
+        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "png": "image/png",
+    }
+    content_type = mime_map.get(ext, "application/octet-stream")
+    filename = url.split("/")[-1].split("?")[0]
+
+    async def stream():
+        async with httpx.AsyncClient(timeout=120) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    return
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+
+    return StreamingResponse(
+        stream(),
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 def get_db():
@@ -65,6 +101,130 @@ def get_all_patients(
     db: Session = Depends(get_db) ): 
     patients = db.query(Demographic).order_by(Demographic.id.desc() ).all() 
     return { "success": True, "data": patients }
+
+
+@patientrouter.get("/{patient_id}")
+def get_complete_patient(patient_id: int, db: Session = Depends(get_db)):
+    patient = db.query(Demographic).filter(Demographic.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    def to_dict(row):
+        if row is None:
+            return {}
+        return {c.name: getattr(row, c.name) for c in row.__table__.columns}
+
+    return {
+        "demographic":         to_dict(patient),
+        "medical_history":     to_dict(db.query(MedicalHistory).filter(MedicalHistory.patient_id == patient_id).first()),
+        "vital_signs":         to_dict(db.query(VitalSigns).filter(VitalSigns.patient_id == patient_id).first()),
+        "lab_results":         to_dict(db.query(LabResults).filter(LabResults.patient_id == patient_id).first()),
+        "medications":         to_dict(db.query(Medications).filter(Medications.patient_id == patient_id).first()),
+        "diagnosis_notes":     to_dict(db.query(DiagnosisNotes).filter(DiagnosisNotes.patient_id == patient_id).first()),
+        "imaging_data":        to_dict(db.query(ImagingData).filter(ImagingData.patient_id == patient_id).first()),
+        "lifestyle_data":      to_dict(db.query(LifestyleData).filter(LifestyleData.patient_id == patient_id).first()),
+        "remote_monitoring":   to_dict(db.query(RemoteMonitoring).filter(RemoteMonitoring.patient_id == patient_id).first()),
+        "hospital_operations": to_dict(db.query(HospitalOperations).filter(HospitalOperations.patient_id == patient_id).first()),
+    }
+
+
+@patientrouter.put("/{patient_id}")
+def update_complete_patient(
+    patient_id: int,
+    demographic: str = Form(...),
+    medical_history: str = Form(...),
+    vital_signs: str = Form(...),
+    lab_results: str = Form(...),
+    medications: str = Form(...),
+    diagnosis_notes: str = Form(...),
+    lifestyle_data: str = Form(...),
+    remote_monitoring: str = Form(...),
+    hospital_operations: str = Form(...),
+    xray: UploadFile | None = File(None),
+    ctScan: UploadFile | None = File(None),
+    mri: UploadFile | None = File(None),
+    ultrasound: UploadFile | None = File(None),
+    dicomImages: UploadFile | None = File(None),
+    radiologyReports: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    patient = db.query(Demographic).filter(Demographic.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    demographic_data      = parse_form_json("demographic",        demographic,        DemographicCreate)
+    medical_history_data  = parse_form_json("medical_history",    medical_history,    MedicalHistorySchema)
+    vital_signs_data      = parse_form_json("vital_signs",        vital_signs,        VitalSignsSchema)
+    lab_results_data      = parse_form_json("lab_results",        lab_results,        LabResultsSchema)
+    medications_data      = parse_form_json("medications",        medications,        MedicationsSchema)
+    diagnosis_notes_data  = parse_form_json("diagnosis_notes",    diagnosis_notes,    DiagnosisNotesSchema)
+    lifestyle_data_parsed = parse_form_json("lifestyle_data",     lifestyle_data,     LifestyleDataSchema)
+    remote_monitoring_data   = parse_form_json("remote_monitoring",   remote_monitoring,   RemoteMonitoringSchema)
+    hospital_operations_data = parse_form_json("hospital_operations", hospital_operations, HospitalOperationsSchema)
+
+    def upsert(model, data_dict):
+        record = db.query(model).filter(model.patient_id == patient_id).first()
+        if record:
+            for k, v in data_dict.items():
+                setattr(record, k, v)
+        else:
+            db.add(model(patient_id=patient_id, **data_dict))
+
+    def safe_upload_or_keep(file, existing_url, category):
+        if file and hasattr(file, "filename") and file.filename:
+            try:
+                new_url = upload_patient_file(file, patient_id, category)
+                if existing_url:
+                    delete_patient_files([existing_url])
+                return new_url
+            except Exception as e:
+                print(f"Upload error for {category}: {e}")
+        return existing_url
+
+    try:
+        for k, v in demographic_data.dict().items():
+            setattr(patient, k, v)
+
+        upsert(MedicalHistory,     medical_history_data.dict())
+        upsert(VitalSigns,         vital_signs_data.dict())
+        upsert(LabResults,         lab_results_data.dict())
+        upsert(Medications,        medications_data.dict())
+        upsert(DiagnosisNotes,     diagnosis_notes_data.dict())
+        upsert(LifestyleData,      lifestyle_data_parsed.dict())
+        upsert(RemoteMonitoring,   remote_monitoring_data.dict())
+        upsert(HospitalOperations, hospital_operations_data.dict())
+
+        imaging = db.query(ImagingData).filter(ImagingData.patient_id == patient_id).first()
+        if imaging:
+            imaging.xray              = safe_upload_or_keep(xray,             imaging.xray,              "xray")
+            imaging.ct_scan           = safe_upload_or_keep(ctScan,           imaging.ct_scan,           "ct-scan")
+            imaging.mri               = safe_upload_or_keep(mri,              imaging.mri,               "mri")
+            imaging.ultrasound        = safe_upload_or_keep(ultrasound,       imaging.ultrasound,        "ultrasound")
+            imaging.dicom_images      = safe_upload_or_keep(dicomImages,      imaging.dicom_images,      "dicom-images")
+            imaging.radiology_reports = safe_upload_or_keep(radiologyReports, imaging.radiology_reports, "radiology-reports")
+        else:
+            db.add(ImagingData(
+                patient_id=patient_id,
+                xray=safe_upload_or_keep(xray, None, "xray"),
+                ct_scan=safe_upload_or_keep(ctScan, None, "ct-scan"),
+                mri=safe_upload_or_keep(mri, None, "mri"),
+                ultrasound=safe_upload_or_keep(ultrasound, None, "ultrasound"),
+                dicom_images=safe_upload_or_keep(dicomImages, None, "dicom-images"),
+                radiology_reports=safe_upload_or_keep(radiologyReports, None, "radiology-reports"),
+            ))
+
+        db.commit()
+        db.refresh(patient)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to update patient record: {str(exc)}") from exc
+
+    return {"message": "Patient record updated successfully", "patient_id": patient_id}
 
 
 @patientrouter.post("/create-complete")
