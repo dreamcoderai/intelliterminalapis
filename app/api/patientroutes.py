@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.core.storage import upload_patient_file
+from app.core.storage import delete_patient_files, upload_patient_file
 from app.models.patientmodel.demographicmodel import Demographic
 from app.models.patientmodel.diagnosisnotesmodel import DiagnosisNotes
 from app.models.patientmodel.hospitaloperationsmodel import HospitalOperations
@@ -60,6 +60,12 @@ def parse_form_json(field_name: str, payload: str, schema_class):
             },
         ) from exc
 
+@patientrouter.get("/get-all") 
+def get_all_patients( 
+    db: Session = Depends(get_db) ): 
+    patients = db.query(Demographic).order_by(Demographic.id.desc() ).all() 
+    return { "success": True, "data": patients }
+
 
 @patientrouter.post("/create-complete")
 def create_complete_patient(
@@ -110,7 +116,9 @@ def create_complete_patient(
             height=demographic_data.height,
             weight=demographic_data.weight,
             bmi=demographic_data.bmi,
-            contact_details=demographic_data.contact_details,
+            phone=demographic_data.phone,
+            email=demographic_data.email,
+            address=demographic_data.address,
             emergency_contact=demographic_data.emergency_contact,
             insurance_details=demographic_data.insurance_details,
         )
@@ -120,23 +128,23 @@ def create_complete_patient(
 
         patient_id = patient.id
 
+        # Safely handle file uploads - check if file exists and has content
+        def safe_upload(file, patient_id, category):
+            if file and hasattr(file, 'filename') and file.filename:
+                try:
+                    return upload_patient_file(file, patient_id, category)
+                except Exception as e:
+                    print(f"Upload error for {category}: {e}")
+                    return None
+            return None
+
         imaging_data = ImagingDataSchema(
-            xray=upload_patient_file(xray, patient_id, "xray") if xray else None,
-            ct_scan=upload_patient_file(ctScan, patient_id, "ct-scan") if ctScan else None,
-            mri=upload_patient_file(mri, patient_id, "mri") if mri else None,
-            ultrasound=upload_patient_file(ultrasound, patient_id, "ultrasound")
-            if ultrasound
-            else None,
-            dicom_images=upload_patient_file(
-                dicomImages, patient_id, "dicom-images"
-            )
-            if dicomImages
-            else None,
-            radiology_reports=upload_patient_file(
-                radiologyReports, patient_id, "radiology-reports"
-            )
-            if radiologyReports
-            else None,
+            xray=safe_upload(xray, patient_id, "xray"),
+            ct_scan=safe_upload(ctScan, patient_id, "ct-scan"),
+            mri=safe_upload(mri, patient_id, "mri"),
+            ultrasound=safe_upload(ultrasound, patient_id, "ultrasound"),
+            dicom_images=safe_upload(dicomImages, patient_id, "dicom-images"),
+            radiology_reports=safe_upload(radiologyReports, patient_id, "radiology-reports"),
         )
 
         db.add(MedicalHistory(patient_id=patient_id, **medical_history_data.dict()))
@@ -166,9 +174,11 @@ def create_complete_patient(
         raise
     except Exception as exc:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail="Failed to save complete patient record",
+            detail=f"Failed to save complete patient record: {str(exc)}",
         ) from exc
 
     return {
@@ -176,3 +186,33 @@ def create_complete_patient(
         "patient_id": patient_id,
         "imaging_data": imaging_data.dict(),
     }
+
+
+@patientrouter.delete("/{patient_id}")
+def delete_patient(patient_id: int, db: Session = Depends(get_db)):
+    patient = db.query(Demographic).filter(Demographic.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    # Collect imaging file URLs before deleting DB records
+    imaging = db.query(ImagingData).filter(ImagingData.patient_id == patient_id).first()
+    if imaging:
+        delete_patient_files([
+            imaging.xray,
+            imaging.ct_scan,
+            imaging.mri,
+            imaging.ultrasound,
+            imaging.dicom_images,
+            imaging.radiology_reports,
+        ])
+
+    for model in [
+        MedicalHistory, VitalSigns, LabResults, Medications,
+        DiagnosisNotes, LifestyleData, RemoteMonitoring,
+        HospitalOperations, ImagingData,
+    ]:
+        db.query(model).filter(model.patient_id == patient_id).delete()
+
+    db.delete(patient)
+    db.commit()
+    return {"success": True, "message": "Patient deleted successfully"}

@@ -1,6 +1,6 @@
 # app/models/patientmodel/demographicmodel.py
 
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, String, Text, func
 from app.core.database import Base
 
 
@@ -16,6 +16,9 @@ class Demographic(Base):
     height = Column(String(50))
     weight = Column(String(50))
     bmi = Column(String(50))
-    contact_details = Column(Text)
+    phone = Column(String(50))
+    email = Column(String(255))
+    address = Column(Text)
     emergency_contact = Column(String(255))
     insurance_details = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -65,3 +65,38 @@ def upload_patient_file(file: UploadFile, patient_id: int, category: str) -> str
         ) from exc
 
     return f"{settings['public_endpoint'].rstrip('/')}/{object_key}"
+
+
+def delete_patient_files(urls: list[str]) -> None:
+    """Delete a list of DO Spaces objects given their public URLs. Silently skips None/empty."""
+    file_urls = [u for u in urls if u]
+    if not file_urls:
+        return
+
+    settings = _get_spaces_settings()
+    public_base = settings["public_endpoint"].rstrip("/")
+
+    client = boto3.client(
+        "s3",
+        region_name=settings["region"],
+        endpoint_url=settings["endpoint_url"],
+        aws_access_key_id=settings["key"],
+        aws_secret_access_key=settings["secret"],
+    )
+
+    objects = []
+    for url in file_urls:
+        if url.startswith(public_base):
+            key = url[len(public_base):].lstrip("/")
+            objects.append({"Key": key})
+
+    if not objects:
+        return
+
+    try:
+        client.delete_objects(
+            Bucket=settings["bucket"],
+            Delete={"Objects": objects, "Quiet": True},
+        )
+    except Exception as exc:
+        print(f"Warning: failed to delete files from object storage: {exc}")
