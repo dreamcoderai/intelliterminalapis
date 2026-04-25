@@ -25,6 +25,7 @@ class UserBase(BaseModel):
     department: Optional[str] = None
     phone: Optional[str] = None
     is_active: bool = True
+    profile_pic: Optional[str] = None
 
 
 # -----------------------------------

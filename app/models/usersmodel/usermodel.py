@@ -15,3 +15,4 @@ class User(Base):
     department = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    profile_pic = Column(String, nullable=True)
