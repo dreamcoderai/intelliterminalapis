@@ -1,6 +1,6 @@
 # app/models/user.py
 
-from sqlalchemy import Column, DateTime, Integer, String, Boolean
+from sqlalchemy import Column, DateTime, Integer, String, Boolean, func
 from app.core.database import Base
 
 
@@ -18,3 +18,4 @@ class User(Base):
     profile_pic = Column(String, nullable=True)
     reset_otp = Column(String, nullable=True)
     reset_otp_expiry = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

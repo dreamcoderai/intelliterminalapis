@@ -32,11 +32,22 @@ def get_db():
 # --------------------------------------------------
 
 @userrouter.get("/", response_model=list[UserResponse])
-def list_users(role: str | None = None, db: Session = Depends(get_db)):
+def list_users(
+    role: str | None = None,
+    search: str | None = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
     query = db.query(User)
     if role:
         query = query.filter(User.role == role)
-    return query.order_by(User.name).all()
+    if search:
+        q = f"%{search}%"
+        query = query.filter(
+            User.name.ilike(q) | User.email.ilike(q) | User.department.ilike(q)
+        )
+    return query.order_by(User.name).offset(skip).limit(limit).all()
 
 
 # --------------------------------------------------

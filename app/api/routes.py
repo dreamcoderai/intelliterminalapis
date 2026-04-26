@@ -96,7 +96,8 @@ def login(
             "role": existing_user.role,
             "department": existing_user.department,
             "phone": existing_user.phone,
-            "is_active": existing_user.is_active
+            "is_active": existing_user.is_active,
+            "profile_pic": existing_user.profile_pic,
         },
         "token": "sample-jwt-token"
     }
@@ -138,6 +139,24 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 # Reset Password — verify OTP + set new password
 # POST /auth/reset-password
 # -----------------------------------
+
+class ChangePasswordRequest(BaseModel):
+    user_id: int
+    current_password: str
+    new_password: str
+
+
+@router.post("/auth/change-password")
+def change_password(payload: ChangePasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.password != payload.current_password:
+        raise HTTPException(status_code=401, detail="Current password is incorrect.")
+    user.password = payload.new_password
+    db.commit()
+    return {"message": "Password changed successfully."}
+
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr

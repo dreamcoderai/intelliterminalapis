@@ -15,6 +15,8 @@ from app.core.database import engine, Base
 # not create tables
 # -----------------------------------
 from app.models.usersmodel.usermodel import User
+from app.models.patientmodel.doctorassessmentmodel import DoctorAssessment  # noqa: F401
+from app.models.patientmodel.nursenotesmodel import NurseNote  # noqa: F401
 
 # -----------------------------------
 # Import Routers
@@ -23,6 +25,8 @@ from app.api.routes import router as router
 from app.api.userroutes import userrouter as userrouter
 from app.api.dashboardroutes import dashboardrouter as dashboardrouter
 from app.api.patientroutes import patientrouter as patientrouter
+from app.api.assessmentroutes import assessmentrouter as assessmentrouter
+from app.api.nursenotesroutes import nursenotesrouter as nursenotesrouter
 
 
 # -----------------------------------
@@ -67,6 +71,8 @@ app.include_router(router)
 app.include_router(userrouter)
 app.include_router(dashboardrouter)
 app.include_router(patientrouter)
+app.include_router(assessmentrouter)
+app.include_router(nursenotesrouter)
 
 
 
