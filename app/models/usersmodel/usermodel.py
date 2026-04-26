@@ -1,6 +1,6 @@
 # app/models/user.py
 
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, DateTime, Integer, String, Boolean
 from app.core.database import Base
 
 
@@ -16,3 +16,5 @@ class User(Base):
     phone = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     profile_pic = Column(String, nullable=True)
+    reset_otp = Column(String, nullable=True)
+    reset_otp_expiry = Column(DateTime, nullable=True)

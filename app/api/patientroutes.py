@@ -96,7 +96,15 @@ def parse_form_json(field_name: str, payload: str, schema_class):
             },
         ) from exc
 
-@patientrouter.get("/get-all") 
+@patientrouter.get("/by-email")
+def get_patient_by_email(email: str, db: Session = Depends(get_db)):
+    patient = db.query(Demographic).filter(Demographic.email == email).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="No patient record found for this account")
+    return {"id": patient.id, "full_name": patient.full_name}
+
+
+@patientrouter.get("/get-all")
 def get_all_patients( 
     db: Session = Depends(get_db) ): 
     patients = db.query(Demographic).order_by(Demographic.id.desc() ).all() 
