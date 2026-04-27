@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.patientmodel.demographicmodel import Demographic
+from app.models.patientmodel.nursenotesmodel import NurseNote
 from app.models.usersmodel.usermodel import User
 
 dashboardrouter = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -47,6 +48,7 @@ def get_stats(db: Session = Depends(get_db)):
     patients   = db.query(Demographic).all()
 
     doctors    = [u for u in users if u.role == "doctor"]
+    nurses     = [u for u in users if u.role == "nurse"]
     executives = [u for u in users if u.role == "executive"]
     active     = [u for u in users if u.is_active]
 
@@ -55,7 +57,7 @@ def get_stats(db: Session = Depends(get_db)):
     user_by_month    = defaultdict(int)
     patient_by_month = defaultdict(int)
 
-    staff = doctors + executives
+    staff = doctors + nurses + executives
     for u in staff:
         if u.created_at:
             key = (u.created_at.year, u.created_at.month)
@@ -144,21 +146,55 @@ def get_stats(db: Session = Depends(get_db)):
 
     departments = [{"name": k, "value": v} for k, v in sorted(dept_counts.items(), key=lambda x: -x[1])]
 
+    # ── nurse notes by type ───────────────────────────────────────────────────
+    all_notes = db.query(NurseNote).all()
+    note_type_counts = defaultdict(int)
+    TYPE_LABELS = {
+        "vital_signs": "Vital Signs",
+        "observation": "Observation",
+        "medication":  "Medication",
+        "general":     "General",
+    }
+    for n in all_notes:
+        note_type_counts[n.note_type or "general"] += 1
+
+    nurse_notes_by_type = [
+        {"name": TYPE_LABELS.get(k, k.replace("_", " ").title()), "value": v}
+        for k, v in note_type_counts.items()
+    ]
+
+    # ── nurse notes per day (last 7 days) ─────────────────────────────────────
+    notes_day_counts = defaultdict(int)
+    for n in all_notes:
+        if n.recorded_at:
+            ts = n.recorded_at
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            delta = (today - ts.date()).days
+            if 0 <= delta < 7:
+                notes_day_counts[ts.strftime("%a")] += 1
+
+    notes_per_day = [{"day": d, "count": notes_day_counts.get(d, 0)} for d in day_labels]
+
     return {
         "counts": {
-            "total_users": len(doctors) + len(executives) + len(patients),
-            "doctors": len(doctors),
+            "total_users": len(doctors) + len(nurses) + len(executives) + len(patients),
+            "doctors":    len(doctors),
+            "nurses":     len(nurses),
             "executives": len(executives),
-            "patients": len(patients),
+            "patients":   len(patients),
             "active_users": len(active),
+            "total_nurse_notes": len(all_notes),
         },
-        "monthly_registrations": monthly,
+        "monthly_registrations":      monthly,
         "weekly_patient_registrations": weekly,
-        "blood_group_distribution": blood_groups,
-        "gender_distribution": gender,
-        "active_split": active_split,
-        "recent_patients": recent_patients,
-        "departments": departments,
+        "blood_group_distribution":   blood_groups,
+        "gender_distribution":        gender,
+        "active_split":               active_split,
+        "recent_patients":            recent_patients,
+        "departments":                departments,
+        "nurse_notes_by_type":        nurse_notes_by_type,
+        "notes_per_day":              notes_per_day,
     }
 
 
