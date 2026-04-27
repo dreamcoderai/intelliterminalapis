@@ -13,12 +13,14 @@ from app.core.database import SessionLocal
 from app.core.storage import delete_patient_files, upload_patient_file
 from app.models.patientmodel.demographicmodel import Demographic
 from app.models.patientmodel.diagnosisnotesmodel import DiagnosisNotes
+from app.models.patientmodel.doctorassessmentmodel import DoctorAssessment
 from app.models.patientmodel.hospitaloperationsmodel import HospitalOperations
 from app.models.patientmodel.imagingdatamodel import ImagingData
 from app.models.patientmodel.labresultsmodel import LabResults
 from app.models.patientmodel.lifestyledatamodel import LifestyleData
 from app.models.patientmodel.medicalhistorymodel import MedicalHistory
 from app.models.patientmodel.medicationsmodel import Medications
+from app.models.patientmodel.nursenotesmodel import NurseNote
 from app.models.patientmodel.remotemonitoringmodel import RemoteMonitoring
 from app.models.patientmodel.vitalsignsmodel import VitalSigns
 from app.schemas.patientschema.demographicschema import DemographicCreate
@@ -154,6 +156,7 @@ def update_complete_patient(
     ultrasound: UploadFile | None = File(None),
     dicomImages: UploadFile | None = File(None),
     radiologyReports: UploadFile | None = File(None),
+    voiceNote: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     patient = db.query(Demographic).filter(Demographic.id == patient_id).first()
@@ -210,6 +213,7 @@ def update_complete_patient(
             imaging.ultrasound        = safe_upload_or_keep(ultrasound,       imaging.ultrasound,        "ultrasound")
             imaging.dicom_images      = safe_upload_or_keep(dicomImages,      imaging.dicom_images,      "dicom-images")
             imaging.radiology_reports = safe_upload_or_keep(radiologyReports, imaging.radiology_reports, "radiology-reports")
+            imaging.voice_url         = safe_upload_or_keep(voiceNote,        imaging.voice_url,         "voice")
         else:
             db.add(ImagingData(
                 patient_id=patient_id,
@@ -219,6 +223,7 @@ def update_complete_patient(
                 ultrasound=safe_upload_or_keep(ultrasound, None, "ultrasound"),
                 dicom_images=safe_upload_or_keep(dicomImages, None, "dicom-images"),
                 radiology_reports=safe_upload_or_keep(radiologyReports, None, "radiology-reports"),
+                voice_url=safe_upload_or_keep(voiceNote, None, "voice"),
             ))
 
         db.commit()
@@ -252,6 +257,7 @@ def create_complete_patient(
     ultrasound: UploadFile | None = File(None),
     dicomImages: UploadFile | None = File(None),
     radiologyReports: UploadFile | None = File(None),
+    voiceNote: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     demographic_data = parse_form_json("demographic", demographic, DemographicCreate)
@@ -313,6 +319,7 @@ def create_complete_patient(
             ultrasound=safe_upload(ultrasound, patient_id, "ultrasound"),
             dicom_images=safe_upload(dicomImages, patient_id, "dicom-images"),
             radiology_reports=safe_upload(radiologyReports, patient_id, "radiology-reports"),
+            voice_url=safe_upload(voiceNote, patient_id, "voice"),
         )
 
         db.add(MedicalHistory(patient_id=patient_id, **medical_history_data.dict()))
@@ -372,9 +379,11 @@ def delete_patient(patient_id: int, db: Session = Depends(get_db)):
             imaging.ultrasound,
             imaging.dicom_images,
             imaging.radiology_reports,
+            imaging.voice_url,
         ])
 
     for model in [
+        NurseNote, DoctorAssessment,
         MedicalHistory, VitalSigns, LabResults, Medications,
         DiagnosisNotes, LifestyleData, RemoteMonitoring,
         HospitalOperations, ImagingData,

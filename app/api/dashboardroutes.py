@@ -47,10 +47,11 @@ def get_stats(db: Session = Depends(get_db)):
     users      = db.query(User).all()
     patients   = db.query(Demographic).all()
 
-    doctors    = [u for u in users if u.role == "doctor"]
-    nurses     = [u for u in users if u.role == "nurse"]
-    executives = [u for u in users if u.role == "executive"]
-    active     = [u for u in users if u.is_active]
+    doctors        = [u for u in users if u.role == "doctor"]
+    nurses         = [u for u in users if u.role == "nurse"]
+    executives     = [u for u in users if u.role == "executive"]
+    patient_users  = [u for u in users if u.role == "patient"]
+    active         = [u for u in users if u.is_active]
 
     # ── monthly registrations (last 6 months) ────────────────────────────────
     months = last_6_months()
@@ -178,11 +179,11 @@ def get_stats(db: Session = Depends(get_db)):
 
     return {
         "counts": {
-            "total_users": len(doctors) + len(nurses) + len(executives) + len(patients),
+            "total_users": len(doctors) + len(nurses) + len(executives) + len(patient_users),
             "doctors":    len(doctors),
             "nurses":     len(nurses),
             "executives": len(executives),
-            "patients":   len(patients),
+            "patients":   len(patient_users),
             "active_users": len(active),
             "total_nurse_notes": len(all_notes),
         },

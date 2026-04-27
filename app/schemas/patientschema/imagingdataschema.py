@@ -10,6 +10,7 @@ class ImagingDataSchema(BaseModel):
     ultrasound: str | None = None
     dicom_images: str | None = None
     radiology_reports: str | None = None
+    voice_url: str | None = None
 
     class Config:
         orm_mode = True

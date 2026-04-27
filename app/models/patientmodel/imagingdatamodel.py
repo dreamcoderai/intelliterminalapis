@@ -16,3 +16,4 @@ class ImagingData(Base):
     ultrasound = Column(String(500))
     dicom_images = Column(String(500))
     radiology_reports = Column(String(500))
+    voice_url = Column(String(500), nullable=True)
