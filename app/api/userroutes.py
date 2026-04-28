@@ -94,6 +94,8 @@ def create_user(
         role=payload.role,
         department=payload.department,
         phone=payload.phone,
+        gender=payload.gender,
+        dob=payload.dob,
         is_active=payload.is_active
     )
 
@@ -130,6 +132,9 @@ def update_profile(
     email: str = Form(...),
     department: str = Form(""),
     phone: str = Form(""),
+    gender: str = Form(""),
+    age: str = Form(""),
+    dob: str = Form(""),
     profile_pic: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
@@ -141,6 +146,9 @@ def update_profile(
     user.email = email
     user.department = department or None
     user.phone = phone or None
+    user.gender = gender or None
+    user.age = int(age) if age.strip().isdigit() else None
+    user.dob = dob or None
 
     if profile_pic and profile_pic.filename:
         if user.profile_pic:
