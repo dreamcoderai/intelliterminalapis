@@ -1,6 +1,6 @@
 # app/models/patientmodel/imagingdatamodel.py
 
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, Text
 
 from app.core.database import Base
 
@@ -17,3 +17,4 @@ class ImagingData(Base):
     dicom_images = Column(String(500))
     radiology_reports = Column(String(500))
     voice_url = Column(String(500), nullable=True)
+    extracted_texts = Column(Text, nullable=True)

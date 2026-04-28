@@ -38,6 +38,46 @@ patientrouter = APIRouter(prefix="/patients", tags=["Patients"])
 
 ALLOWED_SPACE_HOST = os.getenv("SPACE_BUCKET", "") + "." + os.getenv("SPACE_REGION", "") + ".digitaloceanspaces.com"
 
+@patientrouter.post("/extract-text")
+async def extract_text_from_file(file: UploadFile = File(...)):
+    ext = (file.filename or "").split(".")[-1].lower()
+    contents = await file.read()
+    text = ""
+    error = ""
+    try:
+        if ext in ("jpg", "jpeg", "png", "bmp", "tiff", "tif", "webp"):
+            import io
+            import easyocr
+            import numpy as np
+            from PIL import Image
+            img = Image.open(io.BytesIO(contents)).convert("RGB")
+            reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+            results = reader.readtext(np.array(img), detail=0)
+            text = "\n".join(results)
+        elif ext == "pdf":
+            import io
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(contents)) as pdf:
+                pages = [page.extract_text() or "" for page in pdf.pages]
+                text = "\n\n".join(p for p in pages if p.strip())
+        elif ext == "dcm":
+            import io
+            import pydicom
+            ds = pydicom.dcmread(io.BytesIO(contents), stop_before_pixels=True)
+            lines = []
+            for tag in ds:
+                if tag.keyword and tag.value:
+                    val = str(tag.value)
+                    if len(val) < 200:
+                        lines.append(f"{tag.keyword}: {val}")
+            text = "\n".join(lines)
+        else:
+            return {"text": "", "filename": file.filename, "error": f"Unsupported file type: {ext}"}
+    except Exception:
+        text = ""
+    return {"text": text.strip(), "filename": file.filename}
+
+
 @patientrouter.get("/file-proxy")
 async def file_proxy(url: str):
     if ALLOWED_SPACE_HOST not in url:
@@ -157,6 +197,7 @@ def update_complete_patient(
     dicomImages: UploadFile | None = File(None),
     radiologyReports: UploadFile | None = File(None),
     voiceNote: UploadFile | None = File(None),
+    extractedTexts: str = Form(""),
     db: Session = Depends(get_db),
 ):
     patient = db.query(Demographic).filter(Demographic.id == patient_id).first()
@@ -214,6 +255,8 @@ def update_complete_patient(
             imaging.dicom_images      = safe_upload_or_keep(dicomImages,      imaging.dicom_images,      "dicom-images")
             imaging.radiology_reports = safe_upload_or_keep(radiologyReports, imaging.radiology_reports, "radiology-reports")
             imaging.voice_url         = safe_upload_or_keep(voiceNote,        imaging.voice_url,         "voice")
+            if extractedTexts:
+                imaging.extracted_texts = extractedTexts
         else:
             db.add(ImagingData(
                 patient_id=patient_id,
@@ -224,6 +267,7 @@ def update_complete_patient(
                 dicom_images=safe_upload_or_keep(dicomImages, None, "dicom-images"),
                 radiology_reports=safe_upload_or_keep(radiologyReports, None, "radiology-reports"),
                 voice_url=safe_upload_or_keep(voiceNote, None, "voice"),
+                extracted_texts=extractedTexts or None,
             ))
 
         db.commit()
@@ -258,6 +302,7 @@ def create_complete_patient(
     dicomImages: UploadFile | None = File(None),
     radiologyReports: UploadFile | None = File(None),
     voiceNote: UploadFile | None = File(None),
+    extractedTexts: str = Form(""),
     db: Session = Depends(get_db),
 ):
     demographic_data = parse_form_json("demographic", demographic, DemographicCreate)
@@ -320,6 +365,7 @@ def create_complete_patient(
             dicom_images=safe_upload(dicomImages, patient_id, "dicom-images"),
             radiology_reports=safe_upload(radiologyReports, patient_id, "radiology-reports"),
             voice_url=safe_upload(voiceNote, patient_id, "voice"),
+            extracted_texts=extractedTexts or None,
         )
 
         db.add(MedicalHistory(patient_id=patient_id, **medical_history_data.dict()))

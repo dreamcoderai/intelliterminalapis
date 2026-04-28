@@ -11,6 +11,7 @@ class ImagingDataSchema(BaseModel):
     dicom_images: str | None = None
     radiology_reports: str | None = None
     voice_url: str | None = None
+    extracted_texts: str | None = None
 
     class Config:
         orm_mode = True
