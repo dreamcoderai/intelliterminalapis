@@ -340,6 +340,18 @@ def create_complete_patient(
             address=demographic_data.address,
             emergency_contact=demographic_data.emergency_contact,
             insurance_details=demographic_data.insurance_details,
+            address_line1=demographic_data.address_line1,
+            district=demographic_data.district,
+            city=demographic_data.city,
+            state=demographic_data.state,
+            pincode=demographic_data.pincode,
+            country=demographic_data.country,
+            marital_status=demographic_data.marital_status,
+            alternate_number=demographic_data.alternate_number,
+            aadhaar_number=demographic_data.aadhaar_number,
+            abha_number=demographic_data.abha_number,
+            abha_address=demographic_data.abha_address,
+            scan_share_token_id=demographic_data.scan_share_token_id,
         )
 
         db.add(patient)
