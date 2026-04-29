@@ -7,6 +7,7 @@ class DiagnosisNotes(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("demographics.id"))
+    ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
     diagnosis_history = Column(Text)
     doctor_notes = Column(Text)
     symptoms_progression = Column(Text)

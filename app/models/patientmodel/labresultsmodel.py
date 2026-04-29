@@ -7,6 +7,7 @@ class LabResults(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("demographics.id"))
+    ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
     cbc = Column(Text)
     hba1c = Column(Text)
     lipid_profile = Column(Text)
