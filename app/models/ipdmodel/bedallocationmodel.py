@@ -6,7 +6,7 @@ class BedAllocation(Base):
     __tablename__ = "bed_allocations"
     
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("users.id"))
+    patient_id = Column(Integer, ForeignKey("demographics.id"))
     ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"))
     bed_no = Column(String(50))
     bed_type = Column(String(100))

@@ -10,7 +10,6 @@ class ImagingData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("demographics.id"))
-    ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
     xray = Column(String(500))
     ct_scan = Column(String(500))
     mri = Column(String(500))
