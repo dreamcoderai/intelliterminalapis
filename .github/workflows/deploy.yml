@@ -1,0 +1,54 @@
+name: Deploy FastAPI + Postgres
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USER }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        script: |
+          echo "Go to backend folder"
+          cd ~/intelliterminalapis
+
+          echo "Pull latest code"
+          git pull origin main
+
+          echo "Create network if not exists"
+          docker network create appnet || true
+
+          echo "Start Postgres (only if not running)"
+          docker start postgres-db || \
+          docker run -d \
+            --name postgres-db \
+            --network appnet \
+            --env-file .env \
+            -v postgres_data:/var/lib/postgresql/data \
+            --restart always \
+            postgres:15
+
+          echo "Stop old FastAPI"
+          docker rm -f fastapi-app || true
+
+          echo "Build FastAPI"
+          docker build -t fastapi-app .
+
+          echo "Run FastAPI"
+          docker run -d \
+            --name fastapi-app \
+            --network appnet \
+            -p 8000:8000 \
+            --env-file .env \
+            --restart always \
+            fastapi-app
+
+          echo "Deployment done"
