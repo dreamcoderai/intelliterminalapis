@@ -8,6 +8,7 @@ script: |
   echo "Ensure network exists"
   docker network inspect appnet >/dev/null 2>&1 || docker network create appnet
 
+  
   # -----------------------
   # POSTGRES SETUP
   # -----------------------
