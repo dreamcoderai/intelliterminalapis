@@ -1,51 +1,65 @@
-script: |
-  echo "Go to backend folder"
-  cd ~/intelliterminalapis
+name: Deploy FastAPI + Postgres
 
-  echo "Pull latest code"
-  git pull origin main
+on:
+  push:
+    branches:
+      - main
 
-  echo "Ensure network exists"
-  docker network inspect appnet >/dev/null 2>&1 || docker network create appnet
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-  
-  # -----------------------
-  # POSTGRES SETUP
-  # -----------------------
-  if [ "$(docker ps -aq -f name=postgres-db)" ]; then
-    echo "Postgres exists, starting..."
-    docker start postgres-db
-  else
-    echo "Creating Postgres..."
-    docker run -d \
-      --name postgres-db \
-      --network appnet \
-      --env-file .env \
-      -v postgres_data:/var/lib/postgresql/data \
-      -p 5432:5432 \
-      --restart always \
-      postgres:15
-  fi
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DO_HOST }}
+        username: ${{ secrets.DO_USER }}
+        key: ${{ secrets.DO_SSH_KEY }}
+        script: |
+          set -e
 
-  echo "Wait for Postgres to be ready..."
-  sleep 5
+          echo "Go to backend folder"
+          cd ~/intelliterminalapis
 
-  # -----------------------
-  # FASTAPI SETUP
-  # -----------------------
-  echo "Stop old FastAPI (if exists)"
-  docker rm -f fastapi-app || true
+          echo "Pull latest code"
+          git pull origin main
 
-  echo "Build FastAPI"
-  docker build -t fastapi-app .
+          echo "Ensure network exists"
+          docker network inspect appnet >/dev/null 2>&1 || docker network create appnet
 
-  echo "Run FastAPI"
-  docker run -d \
-    --name fastapi-app \
-    --network appnet \
-    -p 8000:8000 \
-    --env-file .env \
-    --restart always \
-    fastapi-app
+          echo "Setup Postgres"
+          if [ "$(docker ps -aq -f name=postgres-db)" ]; then
+            echo "Postgres exists → starting"
+            docker start postgres-db
+          else
+            echo "Creating Postgres container"
+            docker run -d \
+              --name postgres-db \
+              --network appnet \
+              --env-file .env \
+              -v postgres_data:/var/lib/postgresql/data \
+              -p 5432:5432 \
+              --restart always \
+              postgres:15
+          fi
 
-  echo "Deployment done"
+          echo "Wait for Postgres to initialize"
+          sleep 5
+
+          echo "Stop & remove old FastAPI"
+          docker rm -f fastapi-app 2>/dev/null || true
+
+          echo "Build FastAPI image"
+          docker build -t fastapi-app .
+
+          echo "Run FastAPI container"
+          docker run -d \
+            --name fastapi-app \
+            --network appnet \
+            -p 8000:8000 \
+            --env-file .env \
+            --restart always \
+            fastapi-app
+
+          echo "Deployment done ✅"
