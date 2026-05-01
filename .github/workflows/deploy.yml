@@ -28,6 +28,9 @@ jobs:
           echo "Ensure network exists"
           docker network inspect appnet >/dev/null 2>&1 || docker network create appnet
 
+          # -----------------------
+          # POSTGRES SETUP
+          # -----------------------
           echo "Setup Postgres"
           if [ "$(docker ps -aq -f name=postgres-db)" ]; then
             echo "Postgres exists → starting"
@@ -44,10 +47,20 @@ jobs:
               postgres:15
           fi
 
-          echo "Wait for Postgres to initialize"
+          echo "Wait for Postgres"
           sleep 5
 
-          echo "Stop & remove old FastAPI"
+          # -----------------------
+          # FREE PORT 8000
+          # -----------------------
+          echo "Free port 8000 if occupied"
+          docker ps --filter "publish=8000" -q | xargs -r docker stop
+          docker ps -a --filter "publish=8000" -q | xargs -r docker rm
+
+          # -----------------------
+          # FASTAPI DEPLOY
+          # -----------------------
+          echo "Remove old FastAPI container"
           docker rm -f fastapi-app 2>/dev/null || true
 
           echo "Build FastAPI image"
@@ -62,4 +75,4 @@ jobs:
             --restart always \
             fastapi-app
 
-          echo "Deployment done ✅"
+          echo "Deployment completed successfully 🚀"
