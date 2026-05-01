@@ -14,6 +14,9 @@ class User(Base):
     role = Column(String, nullable=False)  # admin / doctor / executive
     department = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    gender = Column(String(20), nullable=True)
+    age = Column(Integer, nullable=True)
+    dob = Column(String(20), nullable=True)
     is_active = Column(Boolean, default=True)
     profile_pic = Column(String, nullable=True)
     reset_otp = Column(String, nullable=True)

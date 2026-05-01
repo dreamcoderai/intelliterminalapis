@@ -1,15 +1,17 @@
 # app/core/database.py
 
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# --------------------------------------------------
-# PostgreSQL Connection String
-# Format:
-# postgresql://username:password@host:port/database
-# --------------------------------------------------
+load_dotenv()
 
-DATABASE_URL = "postgresql://pulseadmin:pulse123@localhost:5432/pulseterminal"
+DATABASE_URL = (
+    f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}"
+    f"@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}"
+    f"/{os.getenv('DB_NAME')}"
+)
 
 # --------------------------------------------------
 # SQLAlchemy Engine
