@@ -1,13 +1,11 @@
 # app/core/email.py
 
 import os
-import smtplib
-import ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from pathlib import Path
 
 from dotenv import load_dotenv
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 _ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
@@ -15,13 +13,10 @@ _ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 def send_otp_email(to_email: str, otp: str, name: str) -> None:
     load_dotenv(_ENV_PATH, override=True)
 
-    smtp_host = os.getenv("SMTP_HOST", "").strip()
-    smtp_port = int(os.getenv("SMTP_PORT", "465").strip())
-    smtp_user = os.getenv("SMTP_USER", "").strip()
-    smtp_pass = os.getenv("SMTP_PASSWORD", "").strip()
-    from_email = os.getenv("SMTP_FROM", smtp_user).strip()
+    api_key = os.getenv("SENDGRID_API_KEY", "").strip()
+    from_email = os.getenv("SMTP_FROM", "").strip()
 
-    if not all([smtp_host, smtp_user, smtp_pass]):
+    if not api_key:
         print(f"[DEV] Password reset OTP for {to_email}: {otp}")
         return
 
@@ -39,26 +34,10 @@ def send_otp_email(to_email: str, otp: str, name: str) -> None:
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Your PulseTerminal Password Reset OTP"
-    msg["From"] = from_email
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html"))
-
-    # GoDaddy (secureserver.net) serves a certificate that fails strict
-    # hostname verification — use a permissive context.
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-
-    try:
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, context=ctx, timeout=15) as server:
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(from_email, to_email, msg.as_string())
-    except (smtplib.SMTPConnectError, ssl.SSLError, OSError):
-        with smtplib.SMTP(smtp_host, 587, timeout=15) as server:
-            server.ehlo()
-            server.starttls(context=ctx)
-            server.ehlo()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(from_email, to_email, msg.as_string())
+    message = Mail(
+        from_email=from_email,
+        to_emails=to_email,
+        subject="Your PulseTerminal Password Reset OTP",
+        html_content=html,
+    )
+    SendGridAPIClient(api_key).send(message)
