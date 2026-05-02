@@ -128,6 +128,8 @@ def parse_form_json(field_name: str, payload: str, schema_class):
         ) from exc
 
     try:
+        if(field_name=='vital_signs'):
+            return [schema_class(**d) for d in data]
         return schema_class(**data)
     except ValidationError as exc:
         raise HTTPException(
@@ -167,7 +169,7 @@ def get_complete_patient(patient_id: int, db: Session = Depends(get_db)):
     return {
         "demographic":         to_dict(patient),
         "medical_history":     to_dict(db.query(MedicalHistory).filter(MedicalHistory.patient_id == patient_id).first()),
-        "vital_signs":         to_dict(db.query(VitalSigns).filter(VitalSigns.patient_id == patient_id).first()),
+        "vital_signs":         [to_dict(v) for v in db.query(VitalSigns).filter(VitalSigns.patient_id == patient_id).all()],
         "lab_results":         to_dict(db.query(LabResults).filter(LabResults.patient_id == patient_id).first()),
         "medications":         to_dict(db.query(Medications).filter(Medications.patient_id == patient_id).first()),
         "diagnosis_notes":     to_dict(db.query(DiagnosisNotes).filter(DiagnosisNotes.patient_id == patient_id).first()),
@@ -238,7 +240,11 @@ def update_complete_patient(
             setattr(patient, k, v)
 
         upsert(MedicalHistory,     medical_history_data.dict())
-        upsert(VitalSigns,         vital_signs_data.dict())
+        
+        # Replace all vital signs for this patient
+        db.query(VitalSigns).filter(VitalSigns.patient_id == patient_id).delete()
+        for vital in vital_signs_data:
+            db.add(VitalSigns(patient_id=patient_id, **vital.dict()))
         upsert(LabResults,         lab_results_data.dict())
         upsert(Medications,        medications_data.dict())
         upsert(DiagnosisNotes,     diagnosis_notes_data.dict())
@@ -340,6 +346,18 @@ def create_complete_patient(
             address=demographic_data.address,
             emergency_contact=demographic_data.emergency_contact,
             insurance_details=demographic_data.insurance_details,
+            address_line1=demographic_data.address_line1,
+            district=demographic_data.district,
+            city=demographic_data.city,
+            state=demographic_data.state,
+            pincode=demographic_data.pincode,
+            country=demographic_data.country,
+            marital_status=demographic_data.marital_status,
+            alternate_number=demographic_data.alternate_number,
+            aadhaar_number=demographic_data.aadhaar_number,
+            abha_number=demographic_data.abha_number,
+            abha_address=demographic_data.abha_address,
+            scan_share_token_id=demographic_data.scan_share_token_id,
         )
 
         db.add(patient)

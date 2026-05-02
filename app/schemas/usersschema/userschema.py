@@ -25,6 +25,9 @@ class UserBase(BaseModel):
     role: UserRole
     department: Optional[str] = None
     phone: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    dob: Optional[str] = None
     is_active: bool = True
     profile_pic: Optional[str] = None
 

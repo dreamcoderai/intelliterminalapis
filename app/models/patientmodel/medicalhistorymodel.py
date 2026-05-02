@@ -16,3 +16,4 @@ class MedicalHistory(Base):
     allergies = Column(Text)
     previous_hospitalizations = Column(Text)
     vaccination_history = Column(Text)
+    social_history = Column(Text)
