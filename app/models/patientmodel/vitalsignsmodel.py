@@ -1,5 +1,5 @@
 # app/models/patientmodel/vitalsignsmodel.py
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, func
 from app.core.database import Base
 
 
@@ -14,11 +14,9 @@ class VitalSigns(Base):
     )
     ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
 
-    blood_pressure = Column(String(100))
-    heart_rate = Column(String(100))
-    spo2 = Column(String(100))
-    temperature = Column(String(100))
-    respiratory_rate = Column(String(100))
-    blood_sugar = Column(String(100))
-    weight_changes = Column(Text)
+    name = Column(String(100))
+    unit = Column(String(50))
+    value = Column(Text)
 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

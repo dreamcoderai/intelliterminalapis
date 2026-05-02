@@ -9,6 +9,7 @@ class MedicalHistorySchema(BaseModel):
     allergies: str | None = None
     previous_hospitalizations: str | None = None
     vaccination_history: str | None = None
+    social_history: str | None = None
 
     class Config:
         orm_mode = True
