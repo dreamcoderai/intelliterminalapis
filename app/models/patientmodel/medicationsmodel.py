@@ -7,6 +7,7 @@ class Medications(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("demographics.id"))
+    ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
     current_medicines = Column(Text)
     dosage = Column(Text)
     frequency = Column(Text)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 # postgresql://username:password@host:port/database
 # --------------------------------------------------
 
-DATABASE_URL = "postgresql://pulseadmin:pulse123@localhost:5432/pulseterminal"
+DATABASE_URL = "postgresql://postgres:msadmin@localhost:5432/fluxion"
 
 # --------------------------------------------------
 # SQLAlchemy Engine

@@ -12,6 +12,7 @@ class VitalSigns(Base):
         Integer,
         ForeignKey("demographics.id")
     )
+    ipd_admission_id = Column(Integer, ForeignKey("ipd_admissions.id"), nullable=True)
 
     name = Column(String(100))
     unit = Column(String(50))
